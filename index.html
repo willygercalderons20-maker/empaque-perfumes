@@ -452,36 +452,64 @@ function reservedFootprint(fit, qty) {
   return { usedL, usedW, usedH };
 }
 
-// Acomoda varias fragancias en orden dentro de la misma caja de envío.
-// Cada fragancia consume una "rebanada" (capas a lo alto) del espacio que
-// va quedando, así la siguiente fragancia solo ve lo que sobró.
+// Divide un hueco libre en hasta 3 huecos libres que no se traslapan, después
+// de reservarle un bloque de usedL×usedW×usedH en una de sus esquinas
+// (corte guillotina en 3 ejes: primero L, luego W, luego H). La suma de
+// volúmenes de los 3 huecos + el bloque reservado da exactamente el volumen
+// original — no se pierde ni se duplica espacio.
+function splitFreeSpace(space, usedL, usedW, usedH) {
+  const EPS = 0.01;
+  const out = [];
+  if (space.l - usedL > EPS) out.push({ l: space.l - usedL, w: space.w, h: space.h });
+  if (space.w - usedW > EPS) out.push({ l: usedL, w: space.w - usedW, h: space.h });
+  if (space.h - usedH > EPS) out.push({ l: usedL, w: usedW, h: space.h - usedH });
+  return out;
+}
+
+// Acomoda varias fragancias en orden dentro de la misma caja de envío usando
+// empaque 3D real (guillotine bin-packing): mantiene una lista de huecos
+// libres (no solo uno), y cada fragancia se reparte entre los huecos donde
+// quepa — así el espacio de piso que una fragancia no usó queda disponible
+// para las que siguen, en vez de quedar bloqueado por altura.
 function packSequential(ship, entries) {
-  let remaining = { l: ship.l, w: ship.w, h: ship.h };
   const shipVol = ship.l * ship.w * ship.h;
+  let freeSpaces = [{ l: ship.l, w: ship.w, h: ship.h }];
   let totalReservedVol = 0;
   const rows = [];
 
   for (const { item, qty } of entries) {
-    if (remaining.l <= 0 || remaining.w <= 0 || remaining.h <= 0) {
-      rows.push({ item, qty, fits: false, placed: 0, capacity: 0, pctOfBox: 0 });
-      continue;
+    let remainingQty = qty;
+    let placed = 0;
+    let reservedForItem = 0;
+
+    // probar primero los huecos más grandes reduce la fragmentación
+    freeSpaces.sort((a, b) => (b.l * b.w * b.h) - (a.l * a.w * a.h));
+    const nextFreeSpaces = [];
+
+    for (const space of freeSpaces) {
+      if (remainingQty <= 0) { nextFreeSpaces.push(space); continue; }
+      const fit = bestFit(space, item);
+      if (!fit || fit.count === 0) { nextFreeSpaces.push(space); continue; }
+      const placeQty = Math.min(remainingQty, fit.count);
+      const { usedL, usedW, usedH } = reservedFootprint(fit, placeQty);
+      reservedForItem += usedL * usedW * usedH;
+      remainingQty -= placeQty;
+      placed += placeQty;
+      nextFreeSpaces.push(...splitFreeSpace(space, usedL, usedW, usedH));
     }
-    const fit = bestFit(remaining, item);
-    const capacity = fit ? fit.count : 0;
-    if (!fit || capacity === 0) {
-      rows.push({ item, qty, fits: false, placed: 0, capacity: 0, pctOfBox: 0 });
-      continue;
-    }
-    const fits = qty <= capacity;
-    const placed = fits ? qty : capacity;
-    const { usedL, usedW, usedH } = reservedFootprint(fit, placed);
-    const reservedVol = usedL * usedW * usedH;
-    totalReservedVol += reservedVol;
-    rows.push({ item, qty, fits, placed, capacity, dims: fit.dims, pctOfBox: (reservedVol / shipVol) * 100 });
-    remaining = { l: remaining.l, w: remaining.w, h: remaining.h - usedH };
+
+    freeSpaces = nextFreeSpaces.filter(s => s.l > 0.01 && s.w > 0.01 && s.h > 0.01);
+    totalReservedVol += reservedForItem;
+    rows.push({ item, qty, fits: remainingQty === 0, placed, capacity: placed, pctOfBox: (reservedForItem / shipVol) * 100 });
   }
 
-  return { rows, remaining, usedPct: Math.min(100, (totalReservedVol / shipVol) * 100) };
+  const freeVol = freeSpaces.reduce((sum, f) => sum + f.l * f.w * f.h, 0);
+  const biggestFree = freeSpaces.reduce(
+    (best, f) => (!best || f.l * f.w * f.h > best.l * best.w * best.h ? f : best),
+    null
+  ) || { l: 0, w: 0, h: 0 };
+
+  return { rows, freeVol, biggestFree, usedPct: Math.min(100, (totalReservedVol / shipVol) * 100) };
 }
 
 // ---------- Render ----------
@@ -607,7 +635,7 @@ function calcMix() {
     return;
   }
 
-  const { rows, remaining, usedPct } = packSequential(ship, entries);
+  const { rows, freeVol, biggestFree, usedPct } = packSequential(ship, entries);
   const anyOverflow = rows.some(r => !r.fits);
   const totalPlaced = rows.reduce((sum, r) => sum + (r.placed || 0), 0);
 
@@ -625,8 +653,12 @@ function calcMix() {
     ${anyOverflow ? `<p class="hint" style="color:var(--warn);">Algunas fragancias no caben completas con el orden y cantidades actuales — revisa las marcadas abajo.</p>` : ""}
     <div style="margin-top:14px;">${rowsHtml}</div>
     <div class="stat-row" style="margin-top:10px; border-top:1px dashed var(--line); padding-top:10px;">
-      <span>Espacio libre restante (aprox.)</span>
-      <b>${fmt(Math.max(0, remaining.l))} × ${fmt(Math.max(0, remaining.w))} × ${fmt(Math.max(0, remaining.h))} cm</b>
+      <span>Volumen libre restante</span>
+      <b>${fmt(freeVol)} cm³</b>
+    </div>
+    <div class="stat-row">
+      <span>Hueco libre más grande</span>
+      <b>${fmt(biggestFree.l)} × ${fmt(biggestFree.w)} × ${fmt(biggestFree.h)} cm</b>
     </div>
   `;
 }

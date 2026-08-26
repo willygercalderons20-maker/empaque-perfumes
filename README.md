@@ -48,11 +48,15 @@ probar antes de desplegar, pero solo persiste en ese navegador.
   fila).
 - En la calculadora puedes agregar varias fragancias distintas con su
   cantidad (ej. 5 de "Oasis 100ml", 1 de "Verde 100") y ver en vivo el %
-  de la caja de envío que van ocupando. El acomodo es secuencial: cada
-  fragancia reserva capas completas de alto dentro del espacio que va
-  quedando, y la siguiente fragancia solo ve lo que sobró — si una
-  cantidad no cabe completa en lo que queda, se marca junto al máximo
-  que sí cabría en esa posición.
+  de la caja de envío que van ocupando. El acomodo usa empaque 3D real
+  (guillotine bin-packing): la caja de envío se trata como una lista de
+  "huecos libres" (no uno solo), cada fragancia se reparte entre los
+  huecos donde quepa probando sus 6 orientaciones, y cada hueco usado se
+  divide en hasta 3 huecos libres nuevos sin traslape ni pérdida de
+  volumen. Así el piso que una fragancia no ocupó queda disponible para
+  las siguientes, en vez de bloquearse por altura como en un empaque por
+  capas simple — si una cantidad no cabe completa en los huecos
+  disponibles, se marca junto al máximo real que sí cabría.
 - La mezcla que armas en la calculadora (caja de envío elegida +
   fragancias con cantidad) se guarda automáticamente igual que el
   catálogo, así que sigue ahí si recargas la página o vuelves después.
