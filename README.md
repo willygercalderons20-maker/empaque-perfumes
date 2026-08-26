@@ -57,6 +57,14 @@ probar antes de desplegar, pero solo persiste en ese navegador.
   las siguientes, en vez de bloquearse por altura como en un empaque por
   capas simple — si una cantidad no cabe completa en los huecos
   disponibles, se marca junto al máximo real que sí cabría.
+- El orden en que se empacan las fragancias afecta cuánto termina cabiendo
+  (la primera procesada tiene "primera opción" de piso libre). Por eso la
+  calculadora no usa el orden en que agregaste las filas para empacar:
+  con 7 fragancias o menos prueba TODAS las combinaciones de orden posibles
+  y usa la que logra acomodar más unidades en total; con más de 7, usa la
+  heurística de acomodar primero las de mayor volumen. Las filas se siguen
+  mostrando en el orden en que las agregaste, solo el cálculo interno se
+  reordena para aprovechar mejor el espacio.
 - La mezcla que armas en la calculadora (caja de envío elegida +
   fragancias con cantidad) se guarda automáticamente igual que el
   catálogo, así que sigue ahí si recargas la página o vuelves después.

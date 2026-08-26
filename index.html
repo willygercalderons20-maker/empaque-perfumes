@@ -477,7 +477,8 @@ function packSequential(ship, entries) {
   let totalReservedVol = 0;
   const rows = [];
 
-  for (const { item, qty } of entries) {
+  for (const entry of entries) {
+    const { item, qty } = entry;
     let remainingQty = qty;
     let placed = 0;
     let reservedForItem = 0;
@@ -500,7 +501,7 @@ function packSequential(ship, entries) {
 
     freeSpaces = nextFreeSpaces.filter(s => s.l > 0.01 && s.w > 0.01 && s.h > 0.01);
     totalReservedVol += reservedForItem;
-    rows.push({ item, qty, fits: remainingQty === 0, placed, capacity: placed, pctOfBox: (reservedForItem / shipVol) * 100 });
+    rows.push({ ...entry, fits: remainingQty === 0, placed, capacity: placed, pctOfBox: (reservedForItem / shipVol) * 100 });
   }
 
   const freeVol = freeSpaces.reduce((sum, f) => sum + f.l * f.w * f.h, 0);
@@ -510,6 +511,40 @@ function packSequential(ship, entries) {
   ) || { l: 0, w: 0, h: 0 };
 
   return { rows, freeVol, biggestFree, usedPct: Math.min(100, (totalReservedVol / shipVol) * 100) };
+}
+
+function permutations(arr) {
+  if (arr.length <= 1) return [arr];
+  const result = [];
+  for (let i = 0; i < arr.length; i++) {
+    const rest = arr.slice(0, i).concat(arr.slice(i + 1));
+    for (const perm of permutations(rest)) result.push([arr[i], ...perm]);
+  }
+  return result;
+}
+
+// packSequential empaca en el orden que le des las fragancias, y ese orden
+// SÍ afecta cuánto termina cabiendo (la primera fragancia procesada tiene
+// "primera opción" de piso libre; las siguientes solo ven lo que sobra).
+// bestPacking busca el orden que más unidades logra acomodar en total, en
+// vez de depender del orden en que el usuario fue agregando las filas.
+// Con pocas fragancias (<=7) prueba TODAS las combinaciones posibles
+// (7! = 5040, instantáneo); con más, usa la heurística de acomodar primero
+// las fragancias de mayor volumen (funciona mejor que un orden arbitrario).
+function bestPacking(ship, entries) {
+  if (entries.length === 0) return packSequential(ship, entries);
+  const MAX_PERMUTE = 7;
+  const candidateOrders = entries.length <= MAX_PERMUTE
+    ? permutations(entries)
+    : [[...entries].sort((a, b) => (b.item.l * b.item.w * b.item.h) - (a.item.l * a.item.w * a.item.h))];
+
+  let best = null;
+  for (const order of candidateOrders) {
+    const result = packSequential(ship, order);
+    const totalPlaced = result.rows.reduce((sum, r) => sum + r.placed, 0);
+    if (!best || totalPlaced > best.totalPlaced) best = { result, totalPlaced };
+  }
+  return best.result;
 }
 
 // ---------- Render ----------
@@ -628,14 +663,18 @@ function calcMix() {
     return;
   }
   const entries = mixRows
-    .map(r => ({ item: perfumeBoxes.find(b => b.id === r.boxId), qty: r.qty }))
+    .map((r, idx) => ({ idx, item: perfumeBoxes.find(b => b.id === r.boxId), qty: r.qty }))
     .filter(e => e.item && e.qty > 0);
   if (entries.length === 0) {
     el.innerHTML = `<p class="hint">Agrega al menos una fragancia con cantidad para calcular.</p>`;
     return;
   }
 
-  const { rows, freeVol, biggestFree, usedPct } = packSequential(ship, entries);
+  const packed = bestPacking(ship, entries);
+  // bestPacking pudo reordenar internamente las fragancias para acomodar más;
+  // aquí se restaura el orden en que el usuario las agregó, solo para mostrarlas.
+  const rows = [...packed.rows].sort((a, b) => a.idx - b.idx);
+  const { freeVol, biggestFree, usedPct } = packed;
   const anyOverflow = rows.some(r => !r.fits);
   const totalPlaced = rows.reduce((sum, r) => sum + (r.placed || 0), 0);
 
