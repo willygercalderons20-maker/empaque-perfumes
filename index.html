@@ -274,7 +274,10 @@
     <div class="panel">
       <h2>Fragancias a empacar</h2>
       <div id="mixRows"></div>
-      <button class="ghost" onclick="addMixRow()" style="margin-top:10px;">+ Agregar fragancia</button>
+      <div style="display:flex; gap:10px; margin-top:10px;">
+        <button class="ghost" onclick="addMixRow()">+ Agregar fragancia</button>
+        <button class="ghost danger" onclick="clearMix()">Limpiar</button>
+      </div>
     </div>
 
     <div class="panel">
@@ -526,24 +529,42 @@ function renderSelects() {
 let mixRows = [];
 let mixRowSeq = 0;
 
-function addMixRow() {
+async function saveMixState() {
+  await saveItem("mix", {
+    id: "current",
+    shipId: document.getElementById("selShipping").value,
+    rows: mixRows.map(r => ({ boxId: r.boxId, qty: r.qty })),
+  });
+}
+
+async function addMixRow() {
   if (perfumeBoxes.length === 0) { alert("Primero registra al menos una caja de perfume."); return; }
   mixRows.push({ id: "row" + (mixRowSeq++), boxId: perfumeBoxes[0].id, qty: 1 });
   renderMixRows();
   calcMix();
+  await saveMixState();
 }
 
-function removeMixRow(id) {
+async function removeMixRow(id) {
   mixRows = mixRows.filter(r => r.id !== id);
   renderMixRows();
   calcMix();
+  await saveMixState();
 }
 
-function updateMixRow(id, field, value) {
+async function updateMixRow(id, field, value) {
   const row = mixRows.find(r => r.id === id);
   if (!row) return;
   row[field] = value;
   calcMix();
+  await saveMixState();
+}
+
+async function clearMix() {
+  mixRows = [];
+  renderMixRows();
+  calcMix();
+  await deleteItem("mix", "current");
 }
 
 function renderMixRows() {
@@ -669,7 +690,7 @@ document.querySelectorAll("nav button").forEach(btn => {
   });
 });
 
-document.getElementById("selShipping").addEventListener("change", calcMix);
+document.getElementById("selShipping").addEventListener("change", () => { calcMix(); saveMixState(); });
 
 // ---------- Init ----------
 (async function init() {
@@ -689,6 +710,17 @@ document.getElementById("selShipping").addEventListener("change", calcMix);
   renderPerfumeTable();
   renderShippingTable();
   renderSelects();
+
+  const savedMix = (await loadList("mix"))[0];
+  if (savedMix) {
+    if (savedMix.shipId && shippingBoxes.some(b => b.id === savedMix.shipId)) {
+      document.getElementById("selShipping").value = savedMix.shipId;
+    }
+    mixRows = (savedMix.rows || [])
+      .filter(r => perfumeBoxes.some(b => b.id === r.boxId))
+      .map(r => ({ id: "row" + (mixRowSeq++), boxId: r.boxId, qty: r.qty }));
+  }
+
   renderMixRows();
   calcMix();
 })();

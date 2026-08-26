@@ -53,3 +53,7 @@ probar antes de desplegar, pero solo persiste en ese navegador.
   quedando, y la siguiente fragancia solo ve lo que sobró — si una
   cantidad no cabe completa en lo que queda, se marca junto al máximo
   que sí cabría en esa posición.
+- La mezcla que armas en la calculadora (caja de envío elegida +
+  fragancias con cantidad) se guarda automáticamente igual que el
+  catálogo, así que sigue ahí si recargas la página o vuelves después.
+  El botón "Limpiar" la borra por completo cuando ya no la necesitas.

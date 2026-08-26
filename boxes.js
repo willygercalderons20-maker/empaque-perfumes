@@ -2,17 +2,18 @@
 // Requiere un KV Namespace ligado con el binding "EMPAQUE_KV" en la configuración
 // del proyecto de Cloudflare Pages (Settings -> Functions -> KV namespace bindings).
 //
-// Guarda dos listas bajo llaves fijas:
+// Guarda listas bajo llaves fijas:
 //   perfume:list   -> catálogo de cajas de perfume del usuario
 //   shipping:list  -> catálogo de cajas de envío (precargado + ediciones)
+//   mix:list       -> mezcla de fragancias que el usuario dejó armada en la calculadora
 //
 // API:
-//   GET    /api/boxes?type=perfume|shipping        -> lista completa
-//   POST   /api/boxes?type=perfume|shipping         body: caja (sin id -> se genera)
-//   DELETE /api/boxes?type=perfume|shipping&id=XXX  -> elimina una caja
+//   GET    /api/boxes?type=perfume|shipping|mix        -> lista completa
+//   POST   /api/boxes?type=perfume|shipping|mix         body: caja (sin id -> se genera)
+//   DELETE /api/boxes?type=perfume|shipping|mix&id=XXX  -> elimina una caja
 
 function keyFor(type) {
-  if (type !== "perfume" && type !== "shipping") return null;
+  if (type !== "perfume" && type !== "shipping" && type !== "mix") return null;
   return `${type}:list`;
 }
 
@@ -30,7 +31,7 @@ export async function onRequestGet(context) {
   const url = new URL(request.url);
   const type = url.searchParams.get("type");
   if (!keyFor(type)) {
-    return new Response(JSON.stringify({ error: "type debe ser 'perfume' o 'shipping'" }), { status: 400 });
+    return new Response(JSON.stringify({ error: "type debe ser 'perfume', 'shipping' o 'mix'" }), { status: 400 });
   }
   const list = await readList(env.EMPAQUE_KV, type);
   return new Response(JSON.stringify(list), {
@@ -43,7 +44,7 @@ export async function onRequestPost(context) {
   const url = new URL(request.url);
   const type = url.searchParams.get("type");
   if (!keyFor(type)) {
-    return new Response(JSON.stringify({ error: "type debe ser 'perfume' o 'shipping'" }), { status: 400 });
+    return new Response(JSON.stringify({ error: "type debe ser 'perfume', 'shipping' o 'mix'" }), { status: 400 });
   }
   const body = await request.json();
   const list = await readList(env.EMPAQUE_KV, type);
