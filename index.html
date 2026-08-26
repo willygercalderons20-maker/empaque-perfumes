@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Empaque de Perfumes — Calculadora Volumétrica</title>
+<style>
+  :root {
+    --bg: #12181b;
+    --panel: #1a2226;
+    --panel-2: #212b30;
+    --line: #2a3539;
+    --text: #e8ede9;
+    --text-dim: #8fa3a8;
+    --accent: #d99a3a;
+    --accent-dim: #8a6a2f;
+    --ok: #5fae7d;
+    --warn: #c9694f;
+    --mono: "SF Mono", "Consolas", "Menlo", monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  header {
+    padding: 28px 24px 20px;
+    border-bottom: 1px solid var(--line);
+  }
+  header h1 {
+    margin: 0;
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  header p {
+    margin: 6px 0 0;
+    color: var(--text-dim);
+    font-size: 13.5px;
+  }
+  nav {
+    display: flex;
+    gap: 4px;
+    padding: 14px 24px 0;
+    border-bottom: 1px solid var(--line);
+  }
+  nav button {
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    padding: 10px 16px;
+    font-size: 14px;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    font-weight: 500;
+  }
+  nav button.active {
+    color: var(--text);
+    border-bottom-color: var(--accent);
+  }
+  main {
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 24px;
+  }
+  .view { display: none; }
+  .view.active { display: block; }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+  .panel h2 {
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-dim);
+    margin: 0 0 16px;
+    font-weight: 600;
+  }
+
+  .grid-form {
+    display: grid;
+    grid-template-columns: 1.4fr 0.7fr 0.7fr 0.7fr auto;
+    gap: 10px;
+    align-items: end;
+  }
+  label {
+    display: block;
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-bottom: 5px;
+  }
+  input, select {
+    width: 100%;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    color: var(--text);
+    padding: 9px 10px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-family: inherit;
+  }
+  input:focus, select:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+  input[type="number"] { font-family: var(--mono); }
+
+  button.primary {
+    background: var(--accent);
+    color: #1a1408;
+    border: none;
+    padding: 9px 16px;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  button.primary:hover { filter: brightness(1.08); }
+  button.ghost {
+    background: none;
+    border: 1px solid var(--line);
+    color: var(--text-dim);
+    padding: 7px 12px;
+    border-radius: 6px;
+    font-size: 12.5px;
+    cursor: pointer;
+  }
+  button.ghost:hover { color: var(--text); border-color: var(--text-dim); }
+  button.danger { color: var(--warn); border-color: var(--warn); }
+
+  table { width: 100%; border-collapse: collapse; margin-top: 4px; }
+  th {
+    text-align: left;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-dim);
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--line);
+    font-weight: 600;
+  }
+  td {
+    padding: 10px 10px;
+    border-bottom: 1px solid var(--line);
+    font-size: 14px;
+  }
+  td.dim, td.price { font-family: var(--mono); color: var(--text-dim); }
+  tr:last-child td { border-bottom: none; }
+  .empty-row td {
+    color: var(--text-dim);
+    font-style: italic;
+    text-align: center;
+    padding: 20px;
+  }
+
+  .calc-selects {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 18px;
+  }
+
+  .mix-row {
+    display: grid;
+    grid-template-columns: 1fr 100px auto;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+
+  .result {
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 18px 20px;
+  }
+  .result .big {
+    font-size: 34px;
+    font-weight: 700;
+    font-family: var(--mono);
+    color: var(--accent);
+    line-height: 1;
+  }
+  .result .label {
+    color: var(--text-dim);
+    font-size: 13px;
+    margin-top: 4px;
+  }
+  .fill-bar {
+    height: 8px;
+    border-radius: 4px;
+    background: var(--line);
+    margin-top: 14px;
+    overflow: hidden;
+  }
+  .fill-bar > div {
+    height: 100%;
+    background: var(--ok);
+  }
+  .stat-row {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 10px;
+    font-size: 13px;
+    color: var(--text-dim);
+  }
+  .stat-row b { color: var(--text); font-family: var(--mono); font-weight: 600; }
+
+  .combo-toggle {
+    margin-top: 18px;
+    padding-top: 16px;
+    border-top: 1px dashed var(--line);
+  }
+  .combo-toggle summary {
+    cursor: pointer;
+    color: var(--text-dim);
+    font-size: 13px;
+    user-select: none;
+  }
+  .combo-result {
+    margin-top: 14px;
+  }
+
+  .hint {
+    font-size: 12.5px;
+    color: var(--text-dim);
+    margin-top: 8px;
+    line-height: 1.5;
+  }
+  .status-pill {
+    display: inline-block;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: var(--panel-2);
+    color: var(--text-dim);
+    border: 1px solid var(--line);
+    margin-left: 8px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Empaque de Perfumes</h1>
+  <p>Catálogo de cajas y calculadora de espacio volumétrico para envíos a Guatemala<span class="status-pill" id="storageStatus">local</span></p>
+</header>
+
+<nav>
+  <button data-view="calc" class="active">Calculadora</button>
+  <button data-view="perfume">Cajas de Perfume</button>
+  <button data-view="shipping">Cajas de Envío</button>
+</nav>
+
+<main>
+
+  <!-- ===== CALCULADORA ===== -->
+  <section class="view active" id="view-calc">
+    <div class="panel">
+      <h2>Caja de envío</h2>
+      <label>Selecciona la caja</label>
+      <select id="selShipping"></select>
+    </div>
+
+    <div class="panel">
+      <h2>Fragancias a empacar</h2>
+      <div id="mixRows"></div>
+      <button class="ghost" onclick="addMixRow()" style="margin-top:10px;">+ Agregar fragancia</button>
+    </div>
+
+    <div class="panel">
+      <h2>Espacio ocupado</h2>
+      <div class="result" id="mixResult">
+        <p class="hint">Agrega una caja de envío y al menos una fragancia con cantidad para calcular.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== CAJAS DE PERFUME ===== -->
+  <section class="view" id="view-perfume">
+    <div class="panel">
+      <h2>Agregar caja de perfume (cm)</h2>
+      <div class="grid-form">
+        <div><label>Nombre / referencia</label><input id="pName" placeholder="Ej. Oasis 100ml"></div>
+        <div><label>Largo</label><input id="pL" type="number" step="0.1" min="0"></div>
+        <div><label>Ancho</label><input id="pW" type="number" step="0.1" min="0"></div>
+        <div><label>Alto</label><input id="pH" type="number" step="0.1" min="0"></div>
+        <button class="primary" onclick="addPerfumeBox()">Agregar</button>
+      </div>
+    </div>
+    <div class="panel">
+      <h2>Catálogo</h2>
+      <table>
+        <thead><tr><th>Nombre</th><th>Dimensiones (cm)</th><th>Volumen</th><th></th></tr></thead>
+        <tbody id="perfumeTable"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ===== CAJAS DE ENVÍO ===== -->
+  <section class="view" id="view-shipping">
+    <div class="panel">
+      <h2>Agregar caja de envío</h2>
+      <div class="grid-form">
+        <div><label>Nombre / referencia</label><input id="sName" placeholder="Ej. 20x20x20"></div>
+        <div><label>Largo (in)</label><input id="sLin" type="number" step="0.1" min="0"></div>
+        <div><label>Ancho (in)</label><input id="sWin" type="number" step="0.1" min="0"></div>
+        <div><label>Alto (in)</label><input id="sHin" type="number" step="0.1" min="0"></div>
+        <button class="primary" onclick="addShippingBox()">Agregar</button>
+      </div>
+      <div class="grid-form" style="margin-top:10px;">
+        <div><label>Precio Guatemala (USD, opcional)</label><input id="sPrice" type="number" step="1" min="0"></div>
+      </div>
+      <p class="hint">Se ingresan en pulgadas (como en la tarifa del transportista) y se convierten a cm automáticamente.</p>
+    </div>
+    <div class="panel">
+      <h2>Catálogo</h2>
+      <table>
+        <thead><tr><th>Nombre</th><th>Pulgadas</th><th>Dimensiones (cm)</th><th>Precio</th><th></th></tr></thead>
+        <tbody id="shippingTable"></tbody>
+      </table>
+    </div>
+  </section>
+
+</main>
+
+<script>
+const IN_TO_CM = 2.54;
+
+const DEFAULT_SHIPPING = [
+  { name: "20x20x20", lin: 20, win: 20, hin: 20, price: 190 },
+  { name: "28x20x20", lin: 28, win: 20, hin: 20, price: 200 },
+  { name: "26x24x24", lin: 26, win: 24, hin: 24, price: 240 },
+  { name: "30x26x24", lin: 30, win: 26, hin: 24, price: 280 },
+  { name: "34x28x26", lin: 34, win: 28, hin: 26, price: 340 },
+  { name: "38x26x26", lin: 38, win: 26, hin: 26, price: 380 },
+].map(b => ({
+  ...b,
+  id: "default-" + b.name,
+  l: +(b.lin * IN_TO_CM).toFixed(2),
+  w: +(b.win * IN_TO_CM).toFixed(2),
+  h: +(b.hin * IN_TO_CM).toFixed(2),
+}));
+
+let perfumeBoxes = [];
+let shippingBoxes = [];
+let usingKV = false;
+
+// ---------- Storage layer: intenta la API (KV en Cloudflare Pages), si no existe usa localStorage ----------
+async function apiAvailable() {
+  try {
+    const r = await fetch("/api/boxes?type=shipping", { method: "GET" });
+    return r.ok;
+  } catch { return false; }
+}
+
+async function loadList(type) {
+  if (usingKV) {
+    const r = await fetch(`/api/boxes?type=${type}`);
+    return r.ok ? await r.json() : [];
+  }
+  const raw = localStorage.getItem(`empaque:${type}`);
+  return raw ? JSON.parse(raw) : [];
+}
+
+async function saveItem(type, item) {
+  if (usingKV) {
+    const r = await fetch(`/api/boxes?type=${type}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(item),
+    });
+    return await r.json();
+  }
+  const list = await loadList(type);
+  const withId = { ...item, id: item.id || crypto.randomUUID() };
+  const idx = list.findIndex(b => b.id === withId.id);
+  if (idx >= 0) list[idx] = withId; else list.push(withId);
+  localStorage.setItem(`empaque:${type}`, JSON.stringify(list));
+  return withId;
+}
+
+async function deleteItem(type, id) {
+  if (usingKV) {
+    await fetch(`/api/boxes?type=${type}&id=${id}`, { method: "DELETE" });
+    return;
+  }
+  const list = (await loadList(type)).filter(b => b.id !== id);
+  localStorage.setItem(`empaque:${type}`, JSON.stringify(list));
+}
+
+// ---------- Empaque: prueba las 6 orientaciones posibles ----------
+function bestFit(ship, item) {
+  const perms = [
+    [item.l, item.w, item.h],
+    [item.l, item.h, item.w],
+    [item.w, item.l, item.h],
+    [item.w, item.h, item.l],
+    [item.h, item.l, item.w],
+    [item.h, item.w, item.l],
+  ];
+  let best = null;
+  for (const [a, b, c] of perms) {
+    if (a <= 0 || b <= 0 || c <= 0) continue;
+    const nx = Math.floor(ship.l / a);
+    const ny = Math.floor(ship.w / b);
+    const nz = Math.floor(ship.h / c);
+    const count = nx * ny * nz;
+    if (!best || count > best.count) {
+      best = { count, nx, ny, nz, dims: [a, b, c], usedL: nx * a, usedW: ny * b, usedH: nz * c };
+    }
+  }
+  return best;
+}
+
+// Acomoda varias fragancias en orden dentro de la misma caja de envío.
+// Cada fragancia consume una "rebanada" (capas completas a lo alto) del espacio
+// que va quedando, así la siguiente fragancia solo ve lo que sobró.
+function packSequential(ship, entries) {
+  let remaining = { l: ship.l, w: ship.w, h: ship.h };
+  const shipVol = ship.l * ship.w * ship.h;
+  let totalReservedVol = 0;
+  const rows = [];
+
+  for (const { item, qty } of entries) {
+    if (remaining.l <= 0 || remaining.w <= 0 || remaining.h <= 0) {
+      rows.push({ item, qty, fits: false, placed: 0, capacity: 0, pctOfBox: 0 });
+      continue;
+    }
+    const fit = bestFit(remaining, item);
+    const perLayer = fit ? fit.nx * fit.ny : 0;
+    const capacity = fit ? fit.count : 0;
+    if (!fit || perLayer === 0 || capacity === 0) {
+      rows.push({ item, qty, fits: false, placed: 0, capacity: 0, pctOfBox: 0 });
+      continue;
+    }
+    const fits = qty <= capacity;
+    const placed = fits ? qty : capacity;
+    const layersNeeded = Math.min(fit.nz, Math.ceil(qty / perLayer));
+    const usedH = layersNeeded * fit.dims[2];
+    const reservedVol = usedH * remaining.l * remaining.w;
+    totalReservedVol += reservedVol;
+    rows.push({ item, qty, fits, placed, capacity, dims: fit.dims, pctOfBox: (reservedVol / shipVol) * 100 });
+    remaining = { l: remaining.l, w: remaining.w, h: remaining.h - usedH };
+  }
+
+  return { rows, remaining, usedPct: Math.min(100, (totalReservedVol / shipVol) * 100) };
+}
+
+// ---------- Render ----------
+function fmt(n) { return (Math.round(n * 100) / 100).toString(); }
+
+function renderPerfumeTable() {
+  const tbody = document.getElementById("perfumeTable");
+  if (perfumeBoxes.length === 0) {
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="4">Aún no has agregado cajas de perfume.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = perfumeBoxes.map(b => `
+    <tr>
+      <td>${b.name}</td>
+      <td class="dim">${fmt(b.l)} × ${fmt(b.w)} × ${fmt(b.h)} cm</td>
+      <td class="dim">${fmt(b.l*b.w*b.h)} cm³</td>
+      <td><button class="ghost danger" onclick="removePerfumeBox('${b.id}')">Eliminar</button></td>
+    </tr>
+  `).join("");
+}
+
+function renderShippingTable() {
+  const tbody = document.getElementById("shippingTable");
+  if (shippingBoxes.length === 0) {
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="5">Sin cajas de envío.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = shippingBoxes.map(b => `
+    <tr>
+      <td>${b.name}</td>
+      <td class="dim">${b.lin}" × ${b.win}" × ${b.hin}"</td>
+      <td class="dim">${fmt(b.l)} × ${fmt(b.w)} × ${fmt(b.h)} cm</td>
+      <td class="price">${b.price ? "$" + b.price : "—"}</td>
+      <td><button class="ghost danger" onclick="removeShippingBox('${b.id}')">Eliminar</button></td>
+    </tr>
+  `).join("");
+}
+
+function renderSelects() {
+  const optsShipping = shippingBoxes.map(b => `<option value="${b.id}">${b.name} — ${fmt(b.l)}×${fmt(b.w)}×${fmt(b.h)} cm${b.price ? " ($"+b.price+")" : ""}</option>`).join("");
+  document.getElementById("selShipping").innerHTML = optsShipping || `<option value="">Sin cajas registradas</option>`;
+}
+
+// ---------- Mezcla de fragancias ----------
+let mixRows = [];
+let mixRowSeq = 0;
+
+function addMixRow() {
+  if (perfumeBoxes.length === 0) { alert("Primero registra al menos una caja de perfume."); return; }
+  mixRows.push({ id: "row" + (mixRowSeq++), boxId: perfumeBoxes[0].id, qty: 1 });
+  renderMixRows();
+  calcMix();
+}
+
+function removeMixRow(id) {
+  mixRows = mixRows.filter(r => r.id !== id);
+  renderMixRows();
+  calcMix();
+}
+
+function updateMixRow(id, field, value) {
+  const row = mixRows.find(r => r.id === id);
+  if (!row) return;
+  row[field] = value;
+  calcMix();
+}
+
+function renderMixRows() {
+  const container = document.getElementById("mixRows");
+  if (perfumeBoxes.length === 0) {
+    mixRows = [];
+    container.innerHTML = `<p class="hint">Primero registra al menos una caja de perfume en la pestaña "Cajas de Perfume".</p>`;
+    return;
+  }
+  mixRows.forEach(row => {
+    if (!perfumeBoxes.some(b => b.id === row.boxId)) row.boxId = perfumeBoxes[0].id;
+  });
+  if (mixRows.length === 0) {
+    container.innerHTML = `<p class="hint">Aún no has agregado fragancias. Usa "+ Agregar fragancia".</p>`;
+    return;
+  }
+  container.innerHTML = mixRows.map(row => {
+    const opts = perfumeBoxes.map(b => `<option value="${b.id}" ${b.id === row.boxId ? "selected" : ""}>${b.name}</option>`).join("");
+    return `
+      <div class="mix-row">
+        <select onchange="updateMixRow('${row.id}','boxId',this.value)">${opts}</select>
+        <input type="number" min="1" step="1" value="${row.qty}" onchange="updateMixRow('${row.id}','qty',parseInt(this.value)||1)">
+        <button class="ghost danger" onclick="removeMixRow('${row.id}')">Eliminar</button>
+      </div>`;
+  }).join("");
+}
+
+function calcMix() {
+  const el = document.getElementById("mixResult");
+  const ship = shippingBoxes.find(b => b.id === document.getElementById("selShipping").value);
+  if (!ship) {
+    el.innerHTML = `<p class="hint">Selecciona una caja de envío.</p>`;
+    return;
+  }
+  const entries = mixRows
+    .map(r => ({ item: perfumeBoxes.find(b => b.id === r.boxId), qty: r.qty }))
+    .filter(e => e.item && e.qty > 0);
+  if (entries.length === 0) {
+    el.innerHTML = `<p class="hint">Agrega al menos una fragancia con cantidad para calcular.</p>`;
+    return;
+  }
+
+  const { rows, remaining, usedPct } = packSequential(ship, entries);
+  const anyOverflow = rows.some(r => !r.fits);
+  const totalPlaced = rows.reduce((sum, r) => sum + (r.placed || 0), 0);
+
+  const rowsHtml = rows.map(r => `
+    <div class="stat-row">
+      <span>${r.item.name} × ${r.qty}${!r.fits ? ` <b style="color:var(--warn)">(solo caben ${r.capacity})</b>` : ""}</span>
+      <b>${r.pctOfBox ? r.pctOfBox.toFixed(1) + "%" : "0%"}</b>
+    </div>
+  `).join("");
+
+  el.innerHTML = `
+    <div class="big">${usedPct.toFixed(1)}%</div>
+    <div class="label">de "${ship.name}" ocupado con ${totalPlaced} unidades en total</div>
+    <div class="fill-bar"><div style="width:${usedPct.toFixed(1)}%; ${usedPct >= 99.9 ? "background:var(--warn);" : ""}"></div></div>
+    ${anyOverflow ? `<p class="hint" style="color:var(--warn);">Algunas fragancias no caben completas con el orden y cantidades actuales — revisa las marcadas abajo.</p>` : ""}
+    <div style="margin-top:14px;">${rowsHtml}</div>
+    <div class="stat-row" style="margin-top:10px; border-top:1px dashed var(--line); padding-top:10px;">
+      <span>Espacio libre restante (aprox.)</span>
+      <b>${fmt(Math.max(0, remaining.l))} × ${fmt(Math.max(0, remaining.w))} × ${fmt(Math.max(0, remaining.h))} cm</b>
+    </div>
+  `;
+}
+
+// ---------- Acciones ----------
+async function addPerfumeBox() {
+  const name = document.getElementById("pName").value.trim();
+  const l = parseFloat(document.getElementById("pL").value);
+  const w = parseFloat(document.getElementById("pW").value);
+  const h = parseFloat(document.getElementById("pH").value);
+  if (!name || !l || !w || !h) { alert("Completa nombre y las 3 dimensiones."); return; }
+  const item = await saveItem("perfume", { name, l, w, h });
+  perfumeBoxes.push(item);
+  document.getElementById("pName").value = "";
+  document.getElementById("pL").value = "";
+  document.getElementById("pW").value = "";
+  document.getElementById("pH").value = "";
+  renderPerfumeTable(); renderSelects(); renderMixRows(); calcMix();
+}
+
+async function removePerfumeBox(id) {
+  await deleteItem("perfume", id);
+  perfumeBoxes = perfumeBoxes.filter(b => b.id !== id);
+  renderPerfumeTable(); renderSelects(); renderMixRows(); calcMix();
+}
+
+async function addShippingBox() {
+  const name = document.getElementById("sName").value.trim();
+  const lin = parseFloat(document.getElementById("sLin").value);
+  const win = parseFloat(document.getElementById("sWin").value);
+  const hin = parseFloat(document.getElementById("sHin").value);
+  const price = parseFloat(document.getElementById("sPrice").value) || null;
+  if (!name || !lin || !win || !hin) { alert("Completa nombre y las 3 dimensiones en pulgadas."); return; }
+  const item = await saveItem("shipping", {
+    name, lin, win, hin, price,
+    l: +(lin * IN_TO_CM).toFixed(2), w: +(win * IN_TO_CM).toFixed(2), h: +(hin * IN_TO_CM).toFixed(2),
+  });
+  shippingBoxes.push(item);
+  document.getElementById("sName").value = "";
+  document.getElementById("sLin").value = "";
+  document.getElementById("sWin").value = "";
+  document.getElementById("sHin").value = "";
+  document.getElementById("sPrice").value = "";
+  renderShippingTable(); renderSelects(); calcMix();
+}
+
+async function removeShippingBox(id) {
+  if (id.startsWith("default-")) { alert("Las cajas precargadas no se pueden eliminar, solo agregar nuevas."); return; }
+  await deleteItem("shipping", id);
+  shippingBoxes = shippingBoxes.filter(b => b.id !== id);
+  renderShippingTable(); renderSelects(); calcMix();
+}
+
+// ---------- Nav ----------
+document.querySelectorAll("nav button").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll("nav button").forEach(b => b.classList.remove("active"));
+    document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
+    btn.classList.add("active");
+    document.getElementById("view-" + btn.dataset.view).classList.add("active");
+  });
+});
+
+document.getElementById("selShipping").addEventListener("change", calcMix);
+
+// ---------- Init ----------
+(async function init() {
+  usingKV = await apiAvailable();
+  document.getElementById("storageStatus").textContent = usingKV ? "guardado en la nube (KV)" : "guardado local (este navegador)";
+
+  shippingBoxes = await loadList("shipping");
+  if (shippingBoxes.length === 0) {
+    // Primera vez: siembra el catálogo con la tarifa de la imagen
+    for (const b of DEFAULT_SHIPPING) {
+      const saved = await saveItem("shipping", b);
+      shippingBoxes.push(saved);
+    }
+  }
+  perfumeBoxes = await loadList("perfume");
+
+  renderPerfumeTable();
+  renderShippingTable();
+  renderSelects();
+  renderMixRows();
+  calcMix();
+})();
+</script>
+</body>
+</html>
