@@ -302,6 +302,7 @@
     </div>
     <div class="panel">
       <h2>Catálogo</h2>
+      <input id="perfumeSearch" placeholder="Buscar por nombre..." oninput="renderPerfumeTable()" style="margin-bottom:14px;">
       <table>
         <thead><tr><th>Nombre</th><th>Dimensiones (cm)</th><th>Volumen</th><th></th></tr></thead>
         <tbody id="perfumeTable"></tbody>
@@ -556,7 +557,13 @@ function renderPerfumeTable() {
     tbody.innerHTML = `<tr class="empty-row"><td colspan="4">Aún no has agregado cajas de perfume.</td></tr>`;
     return;
   }
-  tbody.innerHTML = perfumeBoxes.map(b => `
+  const term = (document.getElementById("perfumeSearch")?.value || "").trim().toLowerCase();
+  const filtered = term ? perfumeBoxes.filter(b => b.name.toLowerCase().includes(term)) : perfumeBoxes;
+  if (filtered.length === 0) {
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="4">Ninguna fragancia coincide con "${term}".</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = filtered.map(b => `
     <tr>
       <td>${b.name}</td>
       <td class="dim">${fmt(b.l)} × ${fmt(b.w)} × ${fmt(b.h)} cm</td>
@@ -630,6 +637,28 @@ async function clearMix() {
   await deleteItem("mix", "current");
 }
 
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+function labelForPerfume(b) {
+  return `${b.name} (${fmt(b.l)}×${fmt(b.w)}×${fmt(b.h)} cm)`;
+}
+
+// El usuario escribe/busca por nombre en el input; esto resuelve lo que
+// escribió contra el catálogo real y actualiza boxId, o revierte el texto
+// si no coincide con ninguna fragancia registrada.
+function resolveMixRowFragrance(rowId, inputEl) {
+  const match = perfumeBoxes.find(b => labelForPerfume(b) === inputEl.value);
+  if (match) {
+    updateMixRow(rowId, "boxId", match.id);
+    return;
+  }
+  const row = mixRows.find(r => r.id === rowId);
+  const current = perfumeBoxes.find(b => b.id === row?.boxId);
+  inputEl.value = current ? labelForPerfume(current) : "";
+}
+
 function renderMixRows() {
   const container = document.getElementById("mixRows");
   if (perfumeBoxes.length === 0) {
@@ -644,11 +673,13 @@ function renderMixRows() {
     container.innerHTML = `<p class="hint">Aún no has agregado fragancias. Usa "+ Agregar fragancia".</p>`;
     return;
   }
-  container.innerHTML = mixRows.map(row => {
-    const opts = perfumeBoxes.map(b => `<option value="${b.id}" ${b.id === row.boxId ? "selected" : ""}>${b.name}</option>`).join("");
+  const datalist = `<datalist id="perfumeOptions">${perfumeBoxes.map(b => `<option value="${escapeHtml(labelForPerfume(b))}">`).join("")}</datalist>`;
+  container.innerHTML = datalist + mixRows.map(row => {
+    const current = perfumeBoxes.find(b => b.id === row.boxId);
+    const label = current ? labelForPerfume(current) : "";
     return `
       <div class="mix-row">
-        <select onchange="updateMixRow('${row.id}','boxId',this.value)">${opts}</select>
+        <input list="perfumeOptions" placeholder="Buscar fragancia..." value="${escapeHtml(label)}" onchange="resolveMixRowFragrance('${row.id}', this)">
         <input type="number" min="1" step="1" value="${row.qty}" onchange="updateMixRow('${row.id}','qty',parseInt(this.value)||1)">
         <button class="ghost danger" onclick="removeMixRow('${row.id}')">Eliminar</button>
       </div>`;

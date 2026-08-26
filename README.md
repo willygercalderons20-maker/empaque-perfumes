@@ -69,3 +69,7 @@ probar antes de desplegar, pero solo persiste en ese navegador.
   fragancias con cantidad) se guarda automáticamente igual que el
   catálogo, así que sigue ahí si recargas la página o vuelves después.
   El botón "Limpiar" la borra por completo cuando ya no la necesitas.
+- Hay buscador en dos lugares para cuando el catálogo crezca: arriba de
+  la tabla en "Cajas de Perfume" (filtra por nombre) y en cada fila de
+  la calculadora (campo de texto con autocompletado nativo — escribe
+  parte del nombre y selecciona de las sugerencias).
