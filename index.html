@@ -422,9 +422,36 @@ function bestFit(ship, item) {
   return best;
 }
 
+// Calcula el bounding box real (largo/ancho/alto) que ocupan "qty" unidades
+// dentro del grid nx×ny×nz que arrojó bestFit — NO asume una capa completa
+// solo porque hay una unidad; llena fila por fila, capa por capa.
+function reservedFootprint(fit, qty) {
+  const [a, b, c] = fit.dims;
+  const perLayer = fit.nx * fit.ny;
+  if (perLayer === 0 || qty <= 0) return { usedL: 0, usedW: 0, usedH: 0 };
+
+  const fullLayers = Math.floor(qty / perLayer);
+  const remLayer = qty - fullLayers * perLayer;
+  const layersUsed = Math.min(fit.nz, fullLayers + (remLayer > 0 ? 1 : 0));
+  const usedH = layersUsed * c;
+
+  if (fullLayers > 0) {
+    // hay al menos una capa completamente llena: esa capa ya reclama el
+    // largo/ancho completos que usa el acomodo óptimo, sin importar qué tan
+    // llena esté la última capa parcial encima.
+    return { usedL: fit.nx * a, usedW: fit.ny * b, usedH };
+  }
+  // todo cabe en una sola capa parcial: llena fila por fila (a lo largo)
+  const rowsNeeded = Math.ceil(remLayer / fit.nx);
+  const itemsInLastRow = remLayer - (rowsNeeded - 1) * fit.nx;
+  const usedW = rowsNeeded * b;
+  const usedL = rowsNeeded > 1 ? fit.nx * a : itemsInLastRow * a;
+  return { usedL, usedW, usedH };
+}
+
 // Acomoda varias fragancias en orden dentro de la misma caja de envío.
-// Cada fragancia consume una "rebanada" (capas completas a lo alto) del espacio
-// que va quedando, así la siguiente fragancia solo ve lo que sobró.
+// Cada fragancia consume una "rebanada" (capas a lo alto) del espacio que
+// va quedando, así la siguiente fragancia solo ve lo que sobró.
 function packSequential(ship, entries) {
   let remaining = { l: ship.l, w: ship.w, h: ship.h };
   const shipVol = ship.l * ship.w * ship.h;
@@ -437,17 +464,15 @@ function packSequential(ship, entries) {
       continue;
     }
     const fit = bestFit(remaining, item);
-    const perLayer = fit ? fit.nx * fit.ny : 0;
     const capacity = fit ? fit.count : 0;
-    if (!fit || perLayer === 0 || capacity === 0) {
+    if (!fit || capacity === 0) {
       rows.push({ item, qty, fits: false, placed: 0, capacity: 0, pctOfBox: 0 });
       continue;
     }
     const fits = qty <= capacity;
     const placed = fits ? qty : capacity;
-    const layersNeeded = Math.min(fit.nz, Math.ceil(qty / perLayer));
-    const usedH = layersNeeded * fit.dims[2];
-    const reservedVol = usedH * remaining.l * remaining.w;
+    const { usedL, usedW, usedH } = reservedFootprint(fit, placed);
+    const reservedVol = usedL * usedW * usedH;
     totalReservedVol += reservedVol;
     rows.push({ item, qty, fits, placed, capacity, dims: fit.dims, pctOfBox: (reservedVol / shipVol) * 100 });
     remaining = { l: remaining.l, w: remaining.w, h: remaining.h - usedH };
