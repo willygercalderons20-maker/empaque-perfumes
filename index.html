@@ -176,6 +176,34 @@
     align-items: center;
     margin-bottom: 10px;
   }
+  .combo { position: relative; }
+  .combo-dropdown {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 20;
+    margin-top: 4px;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    max-height: 240px;
+    overflow-y: auto;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  }
+  .combo-option {
+    padding: 9px 12px;
+    font-size: 13.5px;
+    cursor: pointer;
+  }
+  .combo-option:hover { background: var(--panel); color: var(--text); }
+  .combo-empty {
+    padding: 9px 12px;
+    font-size: 13px;
+    color: var(--text-dim);
+    font-style: italic;
+  }
 
   .result {
     background: var(--panel-2);
@@ -666,18 +694,77 @@ function labelForPerfume(b) {
   return `${b.name} (${fmt(b.l)}×${fmt(b.w)}×${fmt(b.h)} cm)`;
 }
 
-// El usuario escribe/busca por nombre en el input; esto resuelve lo que
-// escribió contra el catálogo real y actualiza boxId, o revierte el texto
-// si no coincide con ninguna fragancia registrada.
-function resolveMixRowFragrance(rowId, inputEl) {
-  const match = perfumeBoxes.find(b => labelForPerfume(b) === inputEl.value);
-  if (match) {
-    updateMixRow(rowId, "boxId", match.id);
+// ---------- Combobox de fragancia (lista desplegable + búsqueda) ----------
+// Al enfocar el campo se abre la lista completa, como un <select>; escribir
+// la filtra en vivo. Un solo combo abierto a la vez; clic afuera cierra y
+// revierte el texto a la fragancia realmente seleccionada.
+let openCombo = null;
+
+function comboOptionsHtml(rowId, term) {
+  const filtered = term ? perfumeBoxes.filter(b => b.name.toLowerCase().includes(term.toLowerCase())) : perfumeBoxes;
+  if (filtered.length === 0) return `<div class="combo-empty">Sin coincidencias</div>`;
+  return filtered.map(b => `<div class="combo-option" data-box-id="${b.id}" onmousedown="selectComboOption('${rowId}','${b.id}')">${escapeHtml(labelForPerfume(b))}</div>`).join("");
+}
+
+function renderComboDropdown(rowId) {
+  const dropdown = document.getElementById(`combo-${rowId}`);
+  const input = document.getElementById(`comboInput-${rowId}`);
+  if (!dropdown || !input) return;
+  dropdown.innerHTML = comboOptionsHtml(rowId, input.value.trim());
+}
+
+function openComboDropdown(rowId) {
+  document.querySelectorAll(".combo-dropdown").forEach(d => d.style.display = "none");
+  openCombo = rowId;
+  // al abrir se muestra la lista COMPLETA, sin filtrar por el texto que ya
+  // tenía el campo (la fragancia actual) — filtrar solo empieza cuando el
+  // usuario escribe (oninput -> renderComboDropdown).
+  const dropdown = document.getElementById(`combo-${rowId}`);
+  if (dropdown) {
+    dropdown.innerHTML = comboOptionsHtml(rowId, "");
+    dropdown.style.display = "block";
+  }
+  const input = document.getElementById(`comboInput-${rowId}`);
+  if (input) input.select();
+}
+
+function closeCombosAndRevert() {
+  if (openCombo) {
+    const rowId = openCombo;
+    const input = document.getElementById(`comboInput-${rowId}`);
+    const row = mixRows.find(r => r.id === rowId);
+    const box = perfumeBoxes.find(b => b.id === row?.boxId);
+    if (input) input.value = box ? labelForPerfume(box) : "";
+  }
+  openCombo = null;
+  document.querySelectorAll(".combo-dropdown").forEach(d => d.style.display = "none");
+}
+
+document.addEventListener("click", e => {
+  if (!e.target.closest(".combo")) closeCombosAndRevert();
+});
+
+async function selectComboOption(rowId, boxId) {
+  const input = document.getElementById(`comboInput-${rowId}`);
+  const box = perfumeBoxes.find(b => b.id === boxId);
+  if (input && box) input.value = labelForPerfume(box);
+  openCombo = null;
+  document.querySelectorAll(".combo-dropdown").forEach(d => d.style.display = "none");
+  await updateMixRow(rowId, "boxId", boxId);
+}
+
+function handleComboKeydown(e, rowId) {
+  if (e.key === "Escape") {
+    closeCombosAndRevert();
+    e.target.blur();
     return;
   }
-  const row = mixRows.find(r => r.id === rowId);
-  const current = perfumeBoxes.find(b => b.id === row?.boxId);
-  inputEl.value = current ? labelForPerfume(current) : "";
+  if (e.key === "Enter") {
+    e.preventDefault();
+    const dropdown = document.getElementById(`combo-${rowId}`);
+    const first = dropdown?.querySelector(".combo-option[data-box-id]");
+    if (first) selectComboOption(rowId, first.dataset.boxId);
+  }
 }
 
 function renderMixRows() {
@@ -694,13 +781,16 @@ function renderMixRows() {
     container.innerHTML = `<p class="hint">Aún no has agregado fragancias. Usa "+ Agregar fragancia".</p>`;
     return;
   }
-  const datalist = `<datalist id="perfumeOptions">${perfumeBoxes.map(b => `<option value="${escapeHtml(labelForPerfume(b))}">`).join("")}</datalist>`;
-  container.innerHTML = datalist + mixRows.map(row => {
+  container.innerHTML = mixRows.map(row => {
     const current = perfumeBoxes.find(b => b.id === row.boxId);
     const label = current ? labelForPerfume(current) : "";
     return `
       <div class="mix-row">
-        <input list="perfumeOptions" placeholder="Buscar fragancia..." value="${escapeHtml(label)}" onchange="resolveMixRowFragrance('${row.id}', this)">
+        <div class="combo">
+          <input id="comboInput-${row.id}" autocomplete="off" placeholder="Buscar o elegir fragancia..." value="${escapeHtml(label)}"
+            onfocus="openComboDropdown('${row.id}')" oninput="renderComboDropdown('${row.id}')" onkeydown="handleComboKeydown(event, '${row.id}')">
+          <div class="combo-dropdown" id="combo-${row.id}"></div>
+        </div>
         <input type="number" min="1" step="1" value="${row.qty}" onchange="updateMixRow('${row.id}','qty',parseInt(this.value)||1)">
         <button class="ghost danger" onclick="removeMixRow('${row.id}')">Eliminar</button>
       </div>`;

@@ -71,8 +71,11 @@ probar antes de desplegar, pero solo persiste en ese navegador.
   El botón "Limpiar" la borra por completo cuando ya no la necesitas.
 - Hay buscador en dos lugares para cuando el catálogo crezca: arriba de
   la tabla en "Cajas de Perfume" (filtra por nombre) y en cada fila de
-  la calculadora (campo de texto con autocompletado nativo — escribe
-  parte del nombre y selecciona de las sugerencias).
+  la calculadora, con un combobox propio (no el datalist nativo del
+  navegador): al hacer clic se despliega la lista completa como un
+  `<select>`, y escribir la filtra en vivo. Clic afuera cierra y
+  revierte a la fragancia realmente seleccionada si el texto no
+  coincide con ninguna.
 - El % mostrado siempre corresponde al volumen real ocupado por la
   cantidad exacta que pusiste, capa por capa y fila por fila — nunca se
   "congela" al llegar a una capa completa. `reservedFootprint()` separa
