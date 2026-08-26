@@ -426,13 +426,26 @@ function bestFit(ship, item) {
   return best;
 }
 
-// Calcula el bounding box real (largo/ancho/alto) que ocupan "qty" unidades
-// dentro del grid nx×ny×nz que arrojó bestFit — NO asume una capa completa
-// solo porque hay una unidad; llena fila por fila, capa por capa.
+// Calcula cuánto espacio ocupan "qty" unidades dentro del grid nx×ny×nz que
+// arrojó bestFit, llenando fila por fila y capa por capa. Devuelve dos cosas
+// distintas, que NO son lo mismo:
+//   - usedL/usedW/usedH: el "sobre" rectangular que se reserva para cortar
+//     el espacio libre (splitFreeSpace). Si todo cabe en una sola capa
+//     parcial se usa la huella justa (fila por fila), para no bloquearle a
+//     la siguiente fragancia más piso del que realmente hace falta. En
+//     cuanto hay al menos una capa completa, el sobre pasa a ser la
+//     rejilla completa (nx×a, ny×b) porque esa capa ya reclamó todo el
+//     piso disponible.
+//   - volume: el volumen REAL ocupado por esas qty unidades — capas
+//     completas exactas más lo que ocupe (fila por fila) la capa parcial
+//     de encima, si la hay. Confundir "volume" con usedL×usedW×usedH fue
+//     el bug original: esa fórmula no distingue una capa de encima medio
+//     vacía de una llena, así que el % se congelaba apenas había una capa
+//     completa (ej. de 51 a 75 unidades siempre mostraba lo mismo).
 function reservedFootprint(fit, qty) {
   const [a, b, c] = fit.dims;
   const perLayer = fit.nx * fit.ny;
-  if (perLayer === 0 || qty <= 0) return { usedL: 0, usedW: 0, usedH: 0 };
+  if (perLayer === 0 || qty <= 0) return { usedL: 0, usedW: 0, usedH: 0, volume: 0 };
 
   const fullLayers = Math.floor(qty / perLayer);
   const remLayer = qty - fullLayers * perLayer;
@@ -440,17 +453,25 @@ function reservedFootprint(fit, qty) {
   const usedH = layersUsed * c;
 
   if (fullLayers > 0) {
-    // hay al menos una capa completamente llena: esa capa ya reclama el
-    // largo/ancho completos que usa el acomodo óptimo, sin importar qué tan
-    // llena esté la última capa parcial encima.
-    return { usedL: fit.nx * a, usedW: fit.ny * b, usedH };
+    const usedL = fit.nx * a;
+    const usedW = fit.ny * b;
+    let volume = fullLayers * usedL * usedW * c;
+    if (remLayer > 0 && fullLayers < fit.nz) {
+      const rowsNeeded = Math.ceil(remLayer / fit.nx);
+      const itemsInLastRow = remLayer - (rowsNeeded - 1) * fit.nx;
+      const partialW = rowsNeeded * b;
+      const partialL = rowsNeeded > 1 ? fit.nx * a : itemsInLastRow * a;
+      volume += partialL * partialW * c;
+    }
+    return { usedL, usedW, usedH, volume };
   }
-  // todo cabe en una sola capa parcial: llena fila por fila (a lo largo)
+
+  // todo cabe en una sola capa parcial: huella ajustada fila por fila
   const rowsNeeded = Math.ceil(remLayer / fit.nx);
   const itemsInLastRow = remLayer - (rowsNeeded - 1) * fit.nx;
   const usedW = rowsNeeded * b;
   const usedL = rowsNeeded > 1 ? fit.nx * a : itemsInLastRow * a;
-  return { usedL, usedW, usedH };
+  return { usedL, usedW, usedH, volume: usedL * usedW * usedH };
 }
 
 // Divide un hueco libre en hasta 3 huecos libres que no se traslapan, después
@@ -493,8 +514,8 @@ function packSequential(ship, entries) {
       const fit = bestFit(space, item);
       if (!fit || fit.count === 0) { nextFreeSpaces.push(space); continue; }
       const placeQty = Math.min(remainingQty, fit.count);
-      const { usedL, usedW, usedH } = reservedFootprint(fit, placeQty);
-      reservedForItem += usedL * usedW * usedH;
+      const { usedL, usedW, usedH, volume } = reservedFootprint(fit, placeQty);
+      reservedForItem += volume;
       remainingQty -= placeQty;
       placed += placeQty;
       nextFreeSpaces.push(...splitFreeSpace(space, usedL, usedW, usedH));

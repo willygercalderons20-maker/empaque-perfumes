@@ -73,3 +73,8 @@ probar antes de desplegar, pero solo persiste en ese navegador.
   la tabla en "Cajas de Perfume" (filtra por nombre) y en cada fila de
   la calculadora (campo de texto con autocompletado nativo — escribe
   parte del nombre y selecciona de las sugerencias).
+- El % mostrado siempre corresponde al volumen real ocupado por la
+  cantidad exacta que pusiste, capa por capa y fila por fila — nunca se
+  "congela" al llegar a una capa completa. `reservedFootprint()` separa
+  a propósito el volumen real (para el %) de la huella que se reserva
+  para cortar el espacio libre (para lo que sigue empacando).
