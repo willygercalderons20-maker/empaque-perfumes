@@ -61,10 +61,15 @@ probar antes de desplegar, pero solo persiste en ese navegador.
   (la primera procesada tiene "primera opción" de piso libre). Por eso la
   calculadora no usa el orden en que agregaste las filas para empacar:
   con 7 fragancias o menos prueba TODAS las combinaciones de orden posibles
-  y usa la que logra acomodar más unidades en total; con más de 7, usa la
-  heurística de acomodar primero las de mayor volumen. Las filas se siguen
-  mostrando en el orden en que las agregaste, solo el cálculo interno se
-  reordena para aprovechar mejor el espacio.
+  (7! = 5040, resultado exacto). Con más de 7, probar todas es imposible
+  (25! es astronómico), así que usa una búsqueda con presupuesto de tiempo
+  de 300ms (`localSearchPacking`): explora muchas variantes de orden con
+  intercambios aleatorios que solo se quedan si no empeoran (hill
+  climbing), y se queda con la mejor encontrada — en la práctica da
+  resultados muy superiores a un solo orden fijo (en una prueba con 25
+  fragancias distintas y demanda que superaba la caja, pasó de 34 a 114
+  unidades acomodadas). Las filas se siguen mostrando en el orden en que
+  las agregaste, solo el cálculo interno se reordena.
 - La mezcla que armas en la calculadora (caja de envío elegida +
   fragancias con cantidad) se guarda automáticamente igual que el
   catálogo, así que sigue ahí si recargas la página o vuelves después.

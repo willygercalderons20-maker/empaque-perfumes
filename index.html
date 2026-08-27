@@ -608,28 +608,69 @@ function permutations(arr) {
   return result;
 }
 
+function totalPlacedFor(ship, order) {
+  const result = packSequential(ship, order);
+  return result.rows.reduce((sum, r) => sum + r.placed, 0);
+}
+
+function shuffleEntries(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+// Con muchas fragancias probar TODOS los órdenes es imposible (25! es
+// astronómico), así que se exploran muchas variantes durante un tiempo
+// límite: arranca de un orden al azar o del mejor encontrado hasta ahora,
+// le aplica intercambios locales quedándose solo con los que no empeoran
+// (hill climbing), y guarda el mejor resultado de toda la búsqueda.
+function localSearchPacking(ship, entries, timeBudgetMs) {
+  let bestOrder = [...entries].sort((a, b) => (b.item.l * b.item.w * b.item.h) - (a.item.l * a.item.w * a.item.h));
+  let bestScore = totalPlacedFor(ship, bestOrder);
+  const start = Date.now();
+
+  while (Date.now() - start < timeBudgetMs) {
+    let candidate = Math.random() < 0.5 ? shuffleEntries(entries) : [...bestOrder];
+    for (let k = 0; k < entries.length; k++) {
+      const i = Math.floor(Math.random() * candidate.length);
+      const j = Math.floor(Math.random() * candidate.length);
+      const swapped = [...candidate];
+      [swapped[i], swapped[j]] = [swapped[j], swapped[i]];
+      if (totalPlacedFor(ship, swapped) >= totalPlacedFor(ship, candidate)) candidate = swapped;
+    }
+    const score = totalPlacedFor(ship, candidate);
+    if (score > bestScore) { bestScore = score; bestOrder = candidate; }
+  }
+  return packSequential(ship, bestOrder);
+}
+
 // packSequential empaca en el orden que le des las fragancias, y ese orden
 // SÍ afecta cuánto termina cabiendo (la primera fragancia procesada tiene
 // "primera opción" de piso libre; las siguientes solo ven lo que sobra).
 // bestPacking busca el orden que más unidades logra acomodar en total, en
 // vez de depender del orden en que el usuario fue agregando las filas.
 // Con pocas fragancias (<=7) prueba TODAS las combinaciones posibles
-// (7! = 5040, instantáneo); con más, usa la heurística de acomodar primero
-// las fragancias de mayor volumen (funciona mejor que un orden arbitrario).
+// (7! = 5040, instantáneo — resultado exacto). Con más, un solo orden fijo
+// puede quedar bastante lejos de lo posible cuando la demanda total supera
+// lo que cabe, así que se usa localSearchPacking con un presupuesto de
+// 300ms, que en la práctica encuentra resultados muy superiores al orden
+// fijo sin que el usuario note la espera.
 function bestPacking(ship, entries) {
   if (entries.length === 0) return packSequential(ship, entries);
   const MAX_PERMUTE = 7;
-  const candidateOrders = entries.length <= MAX_PERMUTE
-    ? permutations(entries)
-    : [[...entries].sort((a, b) => (b.item.l * b.item.w * b.item.h) - (a.item.l * a.item.w * a.item.h))];
-
-  let best = null;
-  for (const order of candidateOrders) {
-    const result = packSequential(ship, order);
-    const totalPlaced = result.rows.reduce((sum, r) => sum + r.placed, 0);
-    if (!best || totalPlaced > best.totalPlaced) best = { result, totalPlaced };
+  if (entries.length <= MAX_PERMUTE) {
+    let best = null;
+    for (const order of permutations(entries)) {
+      const result = packSequential(ship, order);
+      const totalPlaced = result.rows.reduce((sum, r) => sum + r.placed, 0);
+      if (!best || totalPlaced > best.totalPlaced) best = { result, totalPlaced };
+    }
+    return best.result;
   }
-  return best.result;
+  return localSearchPacking(ship, entries, 300);
 }
 
 // ---------- Render ----------
