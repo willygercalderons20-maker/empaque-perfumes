@@ -81,3 +81,10 @@ probar antes de desplegar, pero solo persiste en ese navegador.
   "congela" al llegar a una capa completa. `reservedFootprint()` separa
   a propósito el volumen real (para el %) de la huella que se reserva
   para cortar el espacio libre (para lo que sigue empacando).
+- Dentro de cada hueco libre, una misma fragancia puede terminar usando
+  MÁS de una orientación: `packItemIntoSpace()` coloca primero la mejor
+  orientación para ese hueco y, si sobran unidades por meter y sobra
+  espacio en ese mismo hueco, se llama a sí misma sobre cada sobrante —
+  que puede aprovecharse con una orientación distinta (acostada, de pie,
+  lo que quepa), igual que alguien acomodando cajas a mano en vez de
+  apilar todo igual.

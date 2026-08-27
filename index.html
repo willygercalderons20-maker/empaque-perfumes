@@ -516,11 +516,49 @@ function splitFreeSpace(space, usedL, usedW, usedH) {
   return out;
 }
 
+// Rellena un solo hueco libre con unidades de UNA fragancia, mezclando
+// orientaciones dentro del mismo hueco: coloca su mejor orientación
+// (bestFit), y si sobran unidades por meter Y sobra espacio en ese mismo
+// hueco, se llama a sí misma sobre cada sobrante — que puede terminar
+// usando una orientación DISTINTA (acostada, de pie, lo que quepa), igual
+// que alguien acomodando cajas a mano en vez de solo apilar todo igual.
+function packItemIntoSpace(space, item, qtyNeeded, depth) {
+  depth = depth || 0;
+  if (qtyNeeded <= 0 || space.l <= 0.01 || space.w <= 0.01 || space.h <= 0.01 || depth > 30) {
+    return { placed: 0, volume: 0, leftover: [space] };
+  }
+  const fit = bestFit(space, item);
+  if (!fit || fit.count === 0) return { placed: 0, volume: 0, leftover: [space] };
+
+  const placeQty = Math.min(qtyNeeded, fit.count);
+  const { usedL, usedW, usedH, volume } = reservedFootprint(fit, placeQty);
+  const subSpaces = splitFreeSpace(space, usedL, usedW, usedH);
+
+  let placed = placeQty;
+  let totalVolume = volume;
+  let remaining = qtyNeeded - placeQty;
+  const leftover = [];
+  for (const sub of subSpaces) {
+    if (remaining > 0) {
+      const r = packItemIntoSpace(sub, item, remaining, depth + 1);
+      placed += r.placed;
+      totalVolume += r.volume;
+      remaining -= r.placed;
+      leftover.push(...r.leftover);
+    } else {
+      leftover.push(sub);
+    }
+  }
+  return { placed, volume: totalVolume, leftover };
+}
+
 // Acomoda varias fragancias en orden dentro de la misma caja de envío usando
 // empaque 3D real (guillotine bin-packing): mantiene una lista de huecos
 // libres (no solo uno), y cada fragancia se reparte entre los huecos donde
-// quepa — así el espacio de piso que una fragancia no usó queda disponible
-// para las que siguen, en vez de quedar bloqueado por altura.
+// quepa, mezclando orientaciones dentro de cada hueco vía packItemIntoSpace
+// — así el espacio de piso que una fragancia no usó en su orientación
+// principal todavía puede aprovecharse con otra orientación, en vez de
+// quedar bloqueado y pasar directo a la siguiente fragancia.
 function packSequential(ship, entries) {
   const shipVol = ship.l * ship.w * ship.h;
   let freeSpaces = [{ l: ship.l, w: ship.w, h: ship.h }];
@@ -539,14 +577,11 @@ function packSequential(ship, entries) {
 
     for (const space of freeSpaces) {
       if (remainingQty <= 0) { nextFreeSpaces.push(space); continue; }
-      const fit = bestFit(space, item);
-      if (!fit || fit.count === 0) { nextFreeSpaces.push(space); continue; }
-      const placeQty = Math.min(remainingQty, fit.count);
-      const { usedL, usedW, usedH, volume } = reservedFootprint(fit, placeQty);
-      reservedForItem += volume;
-      remainingQty -= placeQty;
-      placed += placeQty;
-      nextFreeSpaces.push(...splitFreeSpace(space, usedL, usedW, usedH));
+      const result = packItemIntoSpace(space, item, remainingQty);
+      placed += result.placed;
+      reservedForItem += result.volume;
+      remainingQty -= result.placed;
+      nextFreeSpaces.push(...result.leftover);
     }
 
     freeSpaces = nextFreeSpaces.filter(s => s.l > 0.01 && s.w > 0.01 && s.h > 0.01);
